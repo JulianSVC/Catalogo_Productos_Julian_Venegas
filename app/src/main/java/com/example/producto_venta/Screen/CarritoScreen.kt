@@ -4,17 +4,18 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.producto_venta.Clases.Product.Producto
+import com.example.producto_venta.R
 import com.example.producto_venta.Views.ProductViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -23,6 +24,23 @@ fun CarritoScreen(
     navController: NavController,
     viewModel: ProductViewModel
 ) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var productToDelete by remember { mutableStateOf<Producto?>(null) }
+
+    // Función para mostrar el diálogo de confirmación
+    fun confirmDelete(producto: Producto) {
+        productToDelete = producto
+        showDeleteDialog = true
+    }
+
+    // Función para ejecutar la eliminación
+    fun executeDelete() {
+        productToDelete?.let { producto ->
+            viewModel.eliminarDelCarrito(producto)
+        }
+        showDeleteDialog = false
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -68,45 +86,82 @@ fun CarritoScreen(
             }
         }
     ) { innerPadding ->
-        if (viewModel.carrito.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "El carrito está vacío",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(
-                    items = viewModel.carrito,
-                    key = { producto -> producto.id } // Mejora: Usar ID como key para mejor rendimiento
-                ) { producto ->
-                    CarritoItem(
-                        producto = producto,
-                        onDelete = {
-                            // Implementación mejorada similar al removeFromCart
-                            viewModel.eliminarDelCarrito(producto)
+        // Diálogo de confirmación
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("¿Eliminar producto?") },
+                text = { Text("¿Estás seguro de que quieres eliminar este producto del carrito?") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            executeDelete()
                         }
-                    )
+                    ) {
+                        Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showDeleteDialog = false }
+                    ) {
+                        Text("Cancelar")
+                    }
                 }
-            }
+            )
+        }
+
+        if (viewModel.carrito.isEmpty()) {
+            EmptyCartState()
+        } else {
+            CartItemList(
+                carrito = viewModel.carrito,
+                onDeleteItem = { producto -> confirmDelete(producto) },
+                modifier = Modifier.padding(innerPadding)
+            )
         }
     }
 }
 
 @Composable
-fun CarritoItem(
+private fun EmptyCartState() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "El carrito está vacío",
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
+}
+
+@Composable
+private fun CartItemList(
+    carrito: List<Producto>,
+    onDeleteItem: (Producto) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items(
+            items = carrito,
+            key = { producto -> producto.id }
+        ) { producto ->
+            CartItem(
+                producto = producto,
+                onDelete = { onDeleteItem(producto) }
+            )
+        }
+    }
+}
+
+@Composable
+fun CartItem(
     producto: Producto,
     onDelete: () -> Unit
 ) {
@@ -120,6 +175,7 @@ fun CarritoItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Información del producto
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
@@ -144,6 +200,8 @@ fun CarritoItem(
                     )
                 }
             }
+
+            // Botón de eliminar
             IconButton(
                 onClick = onDelete,
                 modifier = Modifier.padding(start = 8.dp)
